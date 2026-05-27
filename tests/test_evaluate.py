@@ -106,7 +106,8 @@ def test_real_labeled_jsonl_loads_and_predicts(monkeypatch):
 
     path = Path(__file__).resolve().parents[1] / "data" / "eval" / "labeled.jsonl"
     dataset = evaluation.load_dataset(path)
-    assert len(dataset) == 5
+    assert len(dataset) > 0
+    # 不綁死筆數（資料集會擴充）；只要求 label 皆合法且兩類都存在
     assert {r["label"] for r in dataset} == {"phishing", "legitimate"}
 
     # mock 出「完美模型」確認資料能跑完評估流程（真實跑分等 GPU）。

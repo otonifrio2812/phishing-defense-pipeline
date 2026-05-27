@@ -79,3 +79,79 @@ def test_confidence_out_of_range_is_rejected_then_retried(monkeypatch):
     monkeypatch.setattr(stage2_intent, "chat", lambda model, prompt, **kw: next(seq))
     result = stage2_intent.run(_msg())
     assert result.confidence == 92
+
+
+def _base(**over):
+    """Stage2Result 必要欄位的基底，供正規化測試覆寫 tactics/evidence。"""
+    return {
+        "verdict": "phishing",
+        "confidence": 90,
+        "tactics": ["緊迫性"],
+        "attack_techniques": ["T1566.002"],
+        "evidence": ["可疑連結"],
+        "summary": "釣魚",
+        **over,
+    }
+
+
+def test_stage2_normalizes_structured_evidence_and_tactics():
+    """本地模型常把 tactics/evidence 回成物件陣列；驗證後應為乾淨的 list[str]。"""
+    from phishguard import forensics, ioc
+    from phishguard.schema import Message, Stage1Result, Stage3Result
+
+    # (1) 純 dict 陣列（含 {type, value}）
+    r1 = Stage2Result.model_validate(
+        _base(
+            evidence=[
+                {"type": "sender-email", "value": "偽冒寄件者網域"},
+                {"type": "link", "value": "可疑外部連結"},
+            ],
+            tactics=[{"type": "urgency", "value": "緊迫性話術"}],
+        )
+    )
+    assert r1.evidence == ["偽冒寄件者網域", "可疑外部連結"]
+    assert r1.tactics == ["緊迫性話術"]
+
+    # (2) str 與 dict 混雜在同一個 list
+    r2 = Stage2Result.model_validate(
+        _base(
+            evidence=["純字串證據", {"type": "link", "value": "連結證據"}],
+            tactics=["權威性", {"value": "稀缺性"}],
+        )
+    )
+    assert r2.evidence == ["純字串證據", "連結證據"]
+    assert r2.tactics == ["權威性", "稀缺性"]
+
+    # (3) dict 無 'value' 鍵的 fallback：description → name → str(整個 dict)
+    r3 = Stage2Result.model_validate(
+        _base(
+            evidence=[
+                {"description": "只有描述"},
+                {"name": "只有名稱"},
+                {"foo": "bar"},
+            ]
+        )
+    )
+    assert r3.evidence[:2] == ["只有描述", "只有名稱"]
+    assert r3.evidence[2] == str({"foo": "bar"})
+
+    # 非 list 也包成單元素 list
+    r4 = Stage2Result.model_validate(_base(evidence="單一字串證據", tactics="單一手法"))
+    assert r4.evidence == ["單一字串證據"]
+    assert r4.tactics == ["單一手法"]
+
+    # 全部項目皆為 str（契約成立）
+    for r in (r1, r2, r3, r4):
+        assert all(isinstance(x, str) for x in r.evidence)
+        assert all(isinstance(x, str) for x in r.tactics)
+
+    # 下游 forensics 契約不變：make_record 對 evidence 逐項 redact（需為 str）
+    msg = Message(case_id="t", body="點此", sender="a@evil.com")
+    record = forensics.make_record(
+        msg, Stage1Result(label="suspicious", reason="x"), r1, Stage3Result(briefing_text="b")
+    )
+    assert all(isinstance(e, str) for e in record["stage2"]["evidence"])
+
+    # 下游 STIX 契約不變：仍能正常產出 bundle
+    bundle = ioc.to_stix_bundle(Message(case_id="t", body="x", urls=["http://evil.com"]), r1)
+    assert bundle is not None

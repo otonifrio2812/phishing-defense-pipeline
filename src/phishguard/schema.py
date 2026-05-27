@@ -9,7 +9,29 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _coerce_to_str(item: object) -> str:
+    """把單一 evidence/tactic 項目壓平成字串（輸出端韌性，不信任 LLM 形狀）。
+
+    str 原樣保留；dict 取 'value'→'description'→'name'，皆無則 str(整個 dict)；
+    其他型別一律 str()。
+    """
+    if isinstance(item, str):
+        return item
+    if isinstance(item, dict):
+        for key in ("value", "description", "name"):
+            if key in item:
+                return str(item[key])
+        return str(item)
+    return str(item)
+
+
+def _normalize_str_list(value: object) -> list[str]:
+    """把欄位正規化成乾淨的 list[str]，容忍 str / dict / 混雜 / 非 list 輸入。"""
+    items = value if isinstance(value, list) else [value]
+    return [_coerce_to_str(x) for x in items]
 
 
 class Channel(str, Enum):
@@ -39,6 +61,14 @@ class Stage2Result(BaseModel):
     attack_techniques: list[str] = []  # 教授對齊：MITRE ID，如 "T1566.002"
     evidence: list[str]
     summary: str
+
+    # 韌性處理：本地模型常把 tactics/evidence 回成物件陣列（如 {"type","value"}），
+    # mode="before" 在驗證前壓平成 list[str]，下游 forensics/STIX 契約不變。
+    # 不改成員 B 的 prompt 原意，純粹是輸出端正規化。
+    @field_validator("tactics", "evidence", mode="before")
+    @classmethod
+    def _flatten_str_list(cls, value: object) -> list[str]:
+        return _normalize_str_list(value)
 
 
 class Stage3Result(BaseModel):

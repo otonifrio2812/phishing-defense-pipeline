@@ -17,6 +17,15 @@ ATTACK_TECHNIQUES: dict[str, str] = {
     "T1657": "Financial Theft",  # BEC / 誘導匯款
 }
 
+# ATT&CK 緩解措施（Mitigation ID -> 名稱）。讓防禦面也能扣到 ATT&CK 標準。
+MITIGATIONS: dict[str, str] = {
+    "M1017": "User Training",
+}
+
+# Stage 3 產出的員工警示對應的緩解措施：**員工教育 = M1017 User Training**。
+# Stage 2 給技術面的 technique（攻擊），Stage 3 對應緩解面的 mitigation（防禦）。
+STAGE3_MITIGATION = "M1017"
+
 # 中文 tactic（子字串）→ technique，供後處理補正模型輸出。
 TACTIC_TO_TECHNIQUE: dict[str, str] = {
     "仿冒品牌": "T1566",

@@ -40,3 +40,9 @@ def test_enrich_combines_and_dedups_across_sources():
     out = mitre.enrich_techniques(["T1566.002"], ["誘導點擊連結", "誘導匯款"])
     # T1566.002 來自模型 + 「誘導點擊連結」（重複，去重），T1657 來自「誘導匯款」
     assert out == ["T1566.002", "T1657"]
+
+
+def test_stage3_mitigation_is_user_training():
+    # Stage 3 員工警示對應緩解措施：員工教育 = M1017 User Training。
+    assert mitre.STAGE3_MITIGATION == "M1017"
+    assert mitre.MITIGATIONS["M1017"] == "User Training"

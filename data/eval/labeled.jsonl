@@ -1,0 +1,5 @@
+{"case_id": "self_01", "channel": "email", "sender": "it-support@company-secure-portal.com", "subject": "【重要】密碼即將到期", "body": "IT 部門通知：請於今日更新密碼，否則帳號停用", "urls": ["http://company-secure-portal.com/reset"], "label": "phishing"}
+{"case_id": "self_02", "channel": "email", "sender": "alice@ourcompany.com", "subject": "下週一專案會議", "body": "下週一開會通知，請確認出席", "urls": [], "label": "legitimate"}
+{"case_id": "self_03", "channel": "email", "sender": "notice@parcel-delivery-update.info", "subject": "包裹配送失敗通知", "body": "您的包裹配送失敗，請點擊連結重新安排", "urls": ["http://parcel-delivery-update.info/reschedule"], "label": "phishing"}
+{"case_id": "self_04", "channel": "email", "sender": "cfo@0urcompany.com", "subject": "急件：供應商匯款核銷", "body": "財務部：請匯款至以下帳號完成核銷", "urls": [], "label": "phishing"}
+{"case_id": "self_05", "channel": "email", "sender": "hr@ourcompany.com", "subject": "本月薪資單上傳通知", "body": "HR：本月薪資單已上傳至系統，請自行下載", "urls": ["https://hr.ourcompany.com/payroll"], "label": "legitimate"}

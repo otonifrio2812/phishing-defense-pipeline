@@ -4,6 +4,7 @@
 能否正確 strip 圍欄、抽 JSON、pydantic 驗證、失敗重試一次」。
 """
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -37,24 +38,38 @@ def _msg(body="點此連結驗證您的帳戶", **kw):
     return Message(case_id="t", body=body, **kw)
 
 
-# --- 成員 A 報告精神：5 筆代表性樣本，輸出皆能通過 Stage1Result 驗證 -------------
-# 每筆模擬 LLM 對該情境會回傳的 raw 字串（含不同雜訊形式）。
-FIVE_SAMPLES = [
-    ('{"label": "safe", "reason": "內部例行通知，無可疑連結"}', "safe"),
-    ('{"label": "suspicious", "reason": "要求點擊外部連結重設密碼"}', "suspicious"),
-    ('```json\n{"label": "suspicious", "reason": "寄件者網域異常"}\n```', "suspicious"),
-    ('好的，分析結果如下：{"label": "suspicious", "reason": "語氣緊迫要求個資"}', "suspicious"),
-    ('```\n{"label": "safe", "reason": "純文字行銷信，無要求個資"}\n```', "safe"),
+# --- 成員 A 報告的 5 筆真實樣本（label = 正確答案 / 模型應輸出的目標）-------------
+# 之後 M6 也會放進 data/self_made/。測試以「模型輸出目標 label」mock LLM，
+# 驗證 Stage1Result 能正確驗證該輸出。
+MEMBER_A_SAMPLES = [
+    ("IT 部門通知：請於今日更新密碼，否則帳號停用", "suspicious"),
+    ("下週一開會通知，請確認出席", "safe"),
+    ("您的包裹配送失敗，請點擊連結重新安排", "suspicious"),
+    ("財務部：請匯款至以下帳號完成核銷", "suspicious"),
+    ("HR：本月薪資單已上傳至系統，請自行下載", "safe"),
 ]
 
 
-@pytest.mark.parametrize("raw,expected_label", FIVE_SAMPLES)
-def test_five_samples_validate(monkeypatch, raw, expected_label):
+@pytest.mark.parametrize("body,label", MEMBER_A_SAMPLES)
+def test_member_a_samples_validate(monkeypatch, body, label):
+    raw = json.dumps({"label": label, "reason": "依樣本預期判定"}, ensure_ascii=False)
     monkeypatch.setattr(stage1_filter, "chat", _fake_chat(raw))
-    result = stage1_filter.run(_msg())
+    result = stage1_filter.run(_msg(body=body))
     assert isinstance(result, Stage1Result)
-    assert result.label == expected_label
+    assert result.label == label
     assert result.reason
+
+
+def test_strips_json_fence(monkeypatch):
+    raw = '```json\n{"label": "suspicious", "reason": "寄件者網域異常"}\n```'
+    monkeypatch.setattr(stage1_filter, "chat", _fake_chat(raw))
+    assert stage1_filter.run(_msg()).label == "suspicious"
+
+
+def test_ignores_leading_prose(monkeypatch):
+    raw = '好的，分析結果如下：{"label": "suspicious", "reason": "語氣緊迫要求個資"}'
+    monkeypatch.setattr(stage1_filter, "chat", _fake_chat(raw))
+    assert stage1_filter.run(_msg()).label == "suspicious"
 
 
 def test_renders_sender_subject_urls_into_prompt(monkeypatch):
@@ -86,7 +101,7 @@ def test_retry_once_then_succeeds(monkeypatch):
 def test_raises_after_two_failures(monkeypatch):
     fake = _fake_chat("壞輸出", "還是壞輸出")
     monkeypatch.setattr(stage1_filter, "chat", fake)
-    with pytest.raises(ValueError, match="已重試一次"):
+    with pytest.raises(ValueError, match="共嘗試 2 次"):
         stage1_filter.run(_msg())
     assert fake.calls["n"] == 2  # 只重試一次，不無限重試
 

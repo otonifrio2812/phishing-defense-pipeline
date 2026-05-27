@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phishguard"
+version = "0.0.0"
+description = "多階段防釣魚與社交工程防禦網（三階段 LLM 釣魚偵測 pipeline）"
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# src-layout：讓 tests 能 import phishguard，無需先 pip install -e .
+pythonpath = ["src"]
+testpaths = ["tests"]

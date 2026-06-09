@@ -52,6 +52,14 @@ class Message(BaseModel):
 class Stage1Result(BaseModel):
     label: Literal["safe", "suspicious"]
     reason: str
+    confidence: Literal["high", "medium", "low"] = "medium"
+
+    # 韌性：本地模型常回大小寫不一或非預期值；mode="before" 正規化，無法辨識則 medium。
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _normalize_confidence(cls, value: object) -> str:
+        s = str(value).strip().lower()
+        return s if s in ("high", "medium", "low") else "medium"
 
 
 class Stage2Result(BaseModel):

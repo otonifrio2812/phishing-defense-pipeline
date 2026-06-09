@@ -155,3 +155,22 @@ def test_stage2_normalizes_structured_evidence_and_tactics():
     # 下游 STIX 契約不變：仍能正常產出 bundle
     bundle = ioc.to_stix_bundle(Message(case_id="t", body="x", urls=["http://evil.com"]), r1)
     assert bundle is not None
+
+
+def test_low_confidence_adds_conservative_instruction(monkeypatch):
+    seen = {}
+    def _chat(model, prompt, **kw):
+        seen["prompt"] = prompt
+        return json.dumps(M365_PAYLOAD, ensure_ascii=False)
+    monkeypatch.setattr(stage2_intent, "chat", _chat)
+    stage2_intent.run(_msg(), low_confidence=True)
+    assert "更保守" in seen["prompt"]
+
+def test_normal_confidence_has_no_extra_instruction(monkeypatch):
+    seen = {}
+    def _chat(model, prompt, **kw):
+        seen["prompt"] = prompt
+        return json.dumps(M365_PAYLOAD, ensure_ascii=False)
+    monkeypatch.setattr(stage2_intent, "chat", _chat)
+    stage2_intent.run(_msg())
+    assert "更保守" not in seen["prompt"]

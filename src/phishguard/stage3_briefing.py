@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .config import get_settings
 from .llm_client import chat
-from .mitre import STAGE3_MITIGATION  # noqa: F401  ATT&CK 緩解對應：M1017 User Training
+from .mitre import MITIGATIONS, STAGE3_MITIGATION  # ATT&CK 緩解對應：M1017 User Training
 from .schema import Stage2Result, Stage3Result
 
 _PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "stage3_briefing.txt"
@@ -26,7 +26,12 @@ def run(s2: Stage2Result) -> Stage3Result:
     """把 Stage2Result 轉成員工可讀警示，回傳 Stage3Result。"""
     # .replace（非 str.format）：與其他 stage 一致，避免誤判大括號為佔位符。
     stage2_json = s2.model_dump_json(indent=2)
-    prompt = _PROMPT_PATH.read_text(encoding="utf-8").replace("{stage2_json}", stage2_json)
+    prompt = (
+        _PROMPT_PATH.read_text(encoding="utf-8")
+        .replace("{mitigation_id}", STAGE3_MITIGATION)
+        .replace("{mitigation_name}", MITIGATIONS[STAGE3_MITIGATION])
+        .replace("{stage2_json}", stage2_json)
+    )
     model = get_settings().model_stage3
 
     for _ in range(2):  # 原始一次 + 空白時重試一次

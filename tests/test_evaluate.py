@@ -46,7 +46,7 @@ def _stub(monkeypatch, label, verdict=None):
         monkeypatch.setattr(
             pipeline.stage2_intent,
             "run",
-            lambda msg: Stage2Result(
+            lambda msg, **kw: Stage2Result(
                 verdict=verdict, confidence=80, tactics=[], attack_techniques=[], evidence=[], summary="s"
             ),
         )
@@ -69,7 +69,7 @@ def _route_by_case(monkeypatch, verdict_by_case):
     monkeypatch.setattr(
         pipeline.stage2_intent,
         "run",
-        lambda msg: Stage2Result(
+        lambda msg, **kw: Stage2Result(
             verdict=verdict_by_case[msg.case_id], confidence=80, tactics=[], attack_techniques=[], evidence=[], summary="s"
         ),
     )
@@ -116,7 +116,7 @@ def test_real_labeled_jsonl_loads_and_predicts(monkeypatch):
     monkeypatch.setattr(
         pipeline.stage2_intent,
         "run",
-        lambda msg: Stage2Result(
+        lambda msg, **kw: Stage2Result(
             verdict=gold[msg.case_id], confidence=80, tactics=[], attack_techniques=[], evidence=[], summary="s"
         ),
     )

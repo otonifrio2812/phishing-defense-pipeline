@@ -25,7 +25,7 @@ def _redirect_outputs(monkeypatch, tmp_path):
 def _stub_stages(monkeypatch, s1, s2=None, s3=None):
     monkeypatch.setattr(pipeline.stage1_filter, "run", lambda msg: s1)
     if s2 is not None:
-        monkeypatch.setattr(pipeline.stage2_intent, "run", lambda msg: s2)
+        monkeypatch.setattr(pipeline.stage2_intent, "run", lambda msg, **kw: s2)
     if s3 is not None:
         monkeypatch.setattr(pipeline.stage3_briefing, "run", lambda s2_in: s3)
 

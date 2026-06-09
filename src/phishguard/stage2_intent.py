@@ -18,10 +18,18 @@ from .schema import Message, Stage2Result
 _PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "stage2_intent.txt"
 
 
-def run(msg: Message) -> Stage2Result:
-    """對單封可疑郵件做 Stage 2 意圖分析，回傳已驗證且 MITRE 補正過的 Stage2Result。"""
+def run(msg: Message, low_confidence: bool = False) -> Stage2Result:
+    """對單封可疑郵件做 Stage 2 意圖分析，回傳已驗證且 MITRE 補正過的 Stage2Result。
+
+    low_confidence：Stage 1 對該郵件初篩信心偏低時，啟用更保守策略（進度報告 5.2）。
+    """
     # .replace（非 str.format）：prompt 含字面 JSON 大括號，不能當成格式佔位符。
     prompt = _PROMPT_PATH.read_text(encoding="utf-8").replace("{message}", render_message(msg))
+    if low_confidence:
+        prompt += (
+            "\n\n【注意】初篩階段對本郵件的信心偏低，請採更保守的判斷策略："
+            "提高警戒、對模糊跡象傾向判為 phishing，以免漏報。"
+        )
     model = get_settings().model_stage2
     result = parse_with_retry(lambda: chat(model, prompt), Stage2Result)
 

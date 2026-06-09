@@ -114,3 +114,18 @@ def test_invalid_label_is_rejected_then_retried(monkeypatch):
     monkeypatch.setattr(stage1_filter, "chat", fake)
     assert stage1_filter.run(_msg()).label == "suspicious"
     assert fake.calls["n"] == 2
+
+
+@pytest.mark.parametrize(
+    "raw_conf,expected",
+    [("high","high"),("HIGH","high"),("Medium","medium"),("low","low"),("不確定","medium")],
+)
+def test_confidence_is_normalized(monkeypatch, raw_conf, expected):
+    raw = json.dumps({"label":"suspicious","reason":"x","confidence":raw_conf}, ensure_ascii=False)
+    monkeypatch.setattr(stage1_filter, "chat", _fake_chat(raw))
+    assert stage1_filter.run(_msg()).confidence == expected
+
+def test_confidence_defaults_to_medium_when_absent(monkeypatch):
+    raw = json.dumps({"label":"safe","reason":"x"}, ensure_ascii=False)
+    monkeypatch.setattr(stage1_filter, "chat", _fake_chat(raw))
+    assert stage1_filter.run(_msg()).confidence == "medium"

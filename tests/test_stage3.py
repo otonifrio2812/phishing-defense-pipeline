@@ -60,6 +60,7 @@ def test_stage2_json_is_injected_into_prompt(monkeypatch):
     p = seen["prompt"]
     assert "{stage2_json}" not in p  # 佔位符已替換
     assert "phishing" in p and "T1566.002" in p  # Stage2 內容（含 MITRE）已注入
+    assert "M1017" in p and "User Training" in p
 
 
 def test_strips_whitespace(monkeypatch):

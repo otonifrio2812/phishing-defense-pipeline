@@ -36,7 +36,7 @@ def process(msg: Message) -> dict:
         record["stix_path"] = None
         return record
 
-    s2 = stage2_intent.run(msg)
+    s2 = stage2_intent.run(msg, low_confidence=(s1.confidence == "low"))
     s3 = stage3_briefing.run(s2)
 
     record = forensics.make_record(msg, s1, s2, s3)

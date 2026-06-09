@@ -80,6 +80,9 @@ MODEL_STAGE3=<旗艦模型名，可同 STAGE2>
 # 跑單一郵件（JSON 為 Message 結構）
 python -m phishguard.pipeline --input data/self_made/case_01.json
 
+# 啟動網頁介面（貼上郵件 → 三階段判讀 → STIX 下載）
+streamlit run app.py
+
 # 評估：印 Precision / Recall / F1（目標 F1 >= 0.85）
 python eval/evaluate.py --dataset data/eval/labeled.jsonl
 

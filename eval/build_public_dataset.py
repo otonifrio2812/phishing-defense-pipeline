@@ -41,6 +41,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from phishguard.evaluation import ingest_record  # noqa: E402
 
+# 大型郵件 body 常超過 csv 預設欄位上限（~128KB）；提高上限避免 _csv.Error（Windows 安全值）。
+csv.field_size_limit(10_000_000)
+
 _TAG_RE = re.compile(r"<[^>]+>")
 _URL_RE = re.compile(r"https?://[^\s<>\"')]+", re.IGNORECASE)
 

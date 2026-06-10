@@ -40,7 +40,7 @@ phishing → STIX 2.1 IOC bundle (reports/<case_id>.stix.json)
 | [forensics.py](src/phishguard/forensics.py) | 數位鑑識：SHA-256 + append-only 稽核日誌 |
 | [ioc.py](src/phishguard/ioc.py) | 資料交換標準：STIX 2.1 IOC 匯出 |
 | [pipeline.py](src/phishguard/pipeline.py) | 串接 1→2→3 + 鑑識 + IOC + CLI |
-| [evaluation.py](src/phishguard/evaluation.py) | 入站遮蔽、預測、P/R/F1 |
+| [evaluation.py](src/phishguard/evaluation.py) | 入站遮蔽、預測、P/R/F1、單一模型 vs 級聯成本比較 |
 
 ---
 
@@ -62,14 +62,14 @@ pip install -r requirements.txt && pip install -e .
 cp .env.example .env
 ```
 
-`.env` 必填（**不得硬編碼、不得 commit**）：
+`.env` 必填（**不得硬編碼、不得 commit**）。本專案以 Glows.ai 雲端 GPU 透過 **Ollama** 部署 **Qwen2.5**；`GLOWS_API_BASE` 指向該 Ollama 的 OpenAI 相容端點（在 GPU 機器上直接執行即為 `localhost:11434`，遠端則以 SSH tunnel 轉埠）。亦可替換為任何 OpenAI 相容端點：
 
 ```
-GLOWS_API_BASE=https://<Glows.ai 的 OpenAI 相容端點>/v1
-GLOWS_API_KEY=<金鑰>
-MODEL_STAGE1=<輕量模型名>
-MODEL_STAGE2=<旗艦模型名>
-MODEL_STAGE3=<旗艦模型名，可同 STAGE2>
+GLOWS_API_BASE=http://localhost:11434/v1   # Glows.ai GPU 上的 Ollama（OpenAI 相容）
+GLOWS_API_KEY=ollama                        # Ollama 不驗金鑰，填任意非空字串
+MODEL_STAGE1=qwen2.5:7b                      # 輕量（Stage 1）
+MODEL_STAGE2=qwen2.5:14b                     # 旗艦（Stage 2）
+MODEL_STAGE3=qwen2.5:14b                     # 旗艦（Stage 3，可同 STAGE2）
 ```
 
 ---
@@ -86,7 +86,14 @@ streamlit run app.py
 # 評估：印 Precision / Recall / F1（目標 F1 >= 0.85）
 python eval/evaluate.py --dataset data/eval/labeled.jsonl
 
-# 測試
+# 比較單一大模型 vs 三階段級聯（準確率 + 旗艦/輕量呼叫成本）
+python eval/compare.py --dataset data/eval/labeled.jsonl
+
+# 由公開語料庫（SpamAssassin / Nazario）建立真實郵件評估集
+python eval/build_public_dataset.py --ham data/raw/easy_ham --phish data/raw/Nazario.csv \
+  --out data/eval/labeled_public.jsonl --per-class 50
+
+# 測試（不需 .env、不打真實 LLM）
 pytest -q
 ```
 
@@ -163,12 +170,70 @@ pytest -q          # 全程不打真實 LLM：mock 掉 chat() 與各 stage，亦
 
 ---
 
+## 評估結果
+
+> 完整方法、逐類別表現與取捨討論見報告「評估結果與成本分析」一節。以下為摘要（基於 commit `dcefbee` / tag `v1.0`）。
+
+在兩份資料集上比較「單一大模型」與「三階段級聯」：
+
+| 資料集 | 方法 | Precision | Recall | F1 | 旗艦呼叫 |
+|---|---|---|---|---|---|
+| 自製 50 | 單一大模型 | 1.000 | 1.000 | 1.000 | 50 |
+| 自製 50 | 三階段級聯 | 1.000 | 1.000 | 1.000 | 25 |
+| 公開 100 | 單一大模型 | 0.766 | 0.980 | 0.860 | 100 |
+| 公開 100 | 三階段級聯 | 0.863 | 0.880 | 0.871 | 51 |
+
+- 自製集兩種做法皆滿分，因樣本同質、過於理想，無法區分優劣（假性滿分）。
+- 公開真實郵件上，級聯 **F1 較高（0.871 > 0.860）、誤報明顯較少（Precision 0.863 > 0.766）**，且**旗艦呼叫減半**（100 → 51）。
+- 公開集：正常 50（SpamAssassin easy_ham）＋ 釣魚 50（Nazario，經 Kaggle phishing-email-dataset 彙整）。
+
+---
+
+## 重現評估
+
+評估分兩個層次：
+
+**（1）程式與測試——完全確定性，不需 LLM / GPU**
+
+```bash
+pip install -r requirements.txt
+pytest -q        # → 86 passed；驗證所有邏輯（解析、遮蔽、MITRE、鑑識、STIX、級聯比較）
+```
+
+**（2）偵測數字——需 LLM 後端（Ollama + Qwen2.5 + GPU）**
+
+```bash
+# 模型（本研究用 Glows.ai 雲端 GPU）
+ollama pull qwen2.5:7b      # 輕量（Stage 1）
+ollama pull qwen2.5:14b     # 旗艦（Stage 2、3）
+cp .env.example .env        # 確認指向你的 Ollama 端點
+
+# 自製集（已隨 repo 提供）
+python eval/compare.py  --dataset data/eval/labeled.jsonl
+python eval/evaluate.py --dataset data/eval/labeled.jsonl
+
+# 公開集：若 data/eval/labeled_public.jsonl 已隨 repo 提供，可直接評估它；
+# 否則用下列指令由公開語料庫重建（seed=42 → 可重現的同一組 100 封）：
+mkdir -p data/raw
+wget -P data/raw https://spamassassin.apache.org/old/publiccorpus/20030228_easy_ham.tar.bz2
+tar xjf data/raw/20030228_easy_ham.tar.bz2 -C data/raw
+kaggle datasets download -d naserabdullahalam/phishing-email-dataset -p data/raw --unzip
+python eval/build_public_dataset.py --ham data/raw/easy_ham --phish data/raw/Nazario.csv \
+  --out data/eval/labeled_public.jsonl --per-class 50
+python eval/compare.py  --dataset data/eval/labeled_public.jsonl
+python eval/evaluate.py --dataset data/eval/labeled_public.jsonl
+```
+
+> **註**：報告數據出自 commit `dcefbee`（tag `v1.0`）。LLM 在 `temperature=0` 大致穩定，但跨 Ollama 版本、量化與硬體可能略有差異，故重現數字應與報告**接近、未必逐位元相同**。
+
+---
+
 ## 目前限制 / 後續
 
-- **真實 P/R/F1 尚未跑**：`eval/evaluate.py` 框架就緒，但實際跑分需有效 `.env` + LLM（GPU 開機時做）。
-- **資料集待擴充**：`data/eval/labeled.jsonl` 目前僅 5 筆自製樣本（3 phishing / 2 legitimate）。
-  藍圖目標為 **≥ 50 筆、正常與釣魚各半**，需加入 Enron（legitimate）與 Nigerian Fraud（phishing）真實郵件——
-  這些放 `data/raw/`（**gitignore，不得 commit**），入站時一律先 `evaluation.ingest_record` 遮蔽個人 PII。
+- **資料集語言**：公開評估集（SpamAssassin、Nazario）為英文，而 prompt 為中文；模型仍能正確處理（間接驗證中英文混雜穩定性），惟中文真實釣魚語料將更貼近目標場景。
+- **樣本規模**：自製 50 封、公開 100 封，受 GPU 成本限制；更大樣本可使估計更穩定。
+- **時間漂移**：Nazario 語料年代較早，而真實釣魚手法持續演化（temporal drift）。
+- **LLM 變異**：評估為單次執行（temperature=0），跨環境數字會接近但未必完全一致。
 - **範圍固定 email**：`Message.channel` 保留 `"line"` 欄位供未來擴充，現階段固定 `"email"`。
 
 ## 不入版控

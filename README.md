@@ -172,7 +172,7 @@ pytest -q          # 全程不打真實 LLM：mock 掉 chat() 與各 stage，亦
 
 ## 評估結果
 
-> 完整方法、逐類別表現與取捨討論見報告「評估結果與成本分析」一節。以下為摘要（基於 commit `dcefbee` / tag `v1.0`）。
+> 完整方法、逐類別表現與取捨討論見報告「評估結果與成本分析」一節。以下為摘要（對應 tag `v1.0`）。
 
 在兩份資料集上比較「單一大模型」與「三階段級聯」：
 
@@ -224,7 +224,7 @@ python eval/compare.py  --dataset data/eval/labeled_public.jsonl
 python eval/evaluate.py --dataset data/eval/labeled_public.jsonl
 ```
 
-> **註**：報告數據出自 commit `dcefbee`（tag `v1.0`）。LLM 在 `temperature=0` 大致穩定，但跨 Ollama 版本、量化與硬體可能略有差異，故重現數字應與報告**接近、未必逐位元相同**。
+> **註**：本評估對應 tag `v1.0`（評估程式自 commit `dcefbee` 起未再變更）。LLM 在 `temperature=0` 大致穩定，但跨 Ollama 版本、量化與硬體可能略有差異，故重現數字應與報告**接近、未必逐位元相同**。
 
 ---
 
